@@ -1,0 +1,70 @@
+NAME
+    Catalyst::Plugin::Static::Simple - Make serving static pages painless.
+
+SYNOPSIS
+        use Catalyst;
+        MyApp->setup( qw/Static::Simple/ );
+    
+DESCRIPTION
+    The Static::Simple plugin is designed to make serving static content in
+    your application during development quick and easy, without requiring a
+    single line of code from you.
+
+    It will detect static files used in your application by looking for file
+    extensions in the URI. By default, you can simply load this plugin and
+    it will immediately begin serving your static files with the correct
+    MIME type. The light-weight MIME::Types module is used to map file
+    extensions to IANA-registered MIME types.
+
+    Note that actions mapped to paths using periods (.) will still operate
+    properly.
+
+    You may further tweak the operation by adding configuration options,
+    described below.
+
+CONFIGURATION
+    Configuration is optional. You may define the following configuration
+    values under MyApp->config->{static}:
+
+        dirs => [
+            'static',
+            qr/^(images|css)/,
+        ]
+    
+    Define a list of top-level directories beneath your 'root' directory
+    that should always be served in static mode. Regular expressions may be
+    specified using qr//.
+
+        mime_types => {
+            jpg => 'images/jpg',
+            png => 'image/png',
+        }    
+    
+    To override or add to the default MIME types set by the MIME::Types
+    module, you may enter your own extension to MIME type mapping.
+
+        debug => 1
+    
+    This will print additional debugging information to the Catalyst log.
+    This is automatically enabled when running Catalyst in -Debug mode.
+
+SEE ALSO
+    Catalyst, Catalyst::Plugin::Static,
+    <http://www.iana.org/assignments/media-types/>
+
+AUTHOR
+    Andy Grundman, "andy@hybridized.org"
+
+THANKS
+    The authors of Catalyst::Plugin::Static:
+
+    Sebastian Riedel, "sri@cpan.org"
+
+    Christian Hansen, "ch@ngmedia.com"
+
+    Marcus Ramberg, "mramberg@cpan.org"
+
+COPYRIGHT
+    This program is free software, you can redistribute it and/or modify it
+    under the same terms as Perl itself.
+
