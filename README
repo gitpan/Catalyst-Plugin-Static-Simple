@@ -23,30 +23,30 @@ DESCRIPTION
     described below.
 
 CONFIGURATION
-    Configuration is optional. You may define the following configuration
-    values under MyApp->config->{static}:
+    Configuration is completely optional and is specified within
+    MyApp->config->{static}.
 
-        dirs => [
-            'static',
-            qr/^(images|css)/,
-        ]
-    
     Define a list of top-level directories beneath your 'root' directory
     that should always be served in static mode. Regular expressions may be
     specified using qr//.
 
-        mime_types => {
-            jpg => 'images/jpg',
-            png => 'image/png',
-        }    
+        MyApp->config->{static}->{dirs} => [
+            'static',
+            qr/^(images|css)/,
+        ]
     
     To override or add to the default MIME types set by the MIME::Types
     module, you may enter your own extension to MIME type mapping.
 
-        debug => 1
+        MyApp->config->{static}->{mime_types} => {
+            jpg => 'images/jpg',
+            png => 'image/png',
+        }    
     
-    This will print additional debugging information to the Catalyst log.
+    Enable additional debugging information printed in the Catalyst log.
     This is automatically enabled when running Catalyst in -Debug mode.
+
+        MyApp->config->{static}->{debug} => 1
 
 SEE ALSO
     Catalyst, Catalyst::Plugin::Static,

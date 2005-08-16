@@ -1,15 +1,16 @@
 package Catalyst::Plugin::Static::Simple;
 
 use strict;
-use base qw/Class::Data::Inheritable/;
+use base qw/Class::Accessor::Fast Class::Data::Inheritable/;
 use File::Slurp;
 use File::stat;
 use MIME::Types;
 use NEXT;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 __PACKAGE__->mk_classdata('_mime_types');
+__PACKAGE__->mk_accessors('_served_static');
 
 =head1 NAME
 
@@ -40,30 +41,29 @@ below.
 
 =head1 CONFIGURATION
 
-Configuration is optional.  You may define the following configuration values under
-MyApp->config->{static}:
+Configuration is completely optional and is specified within MyApp->config->{static}.
 
-    dirs => [
-        'static',
-        qr/^(images|css)/,
-    ]
-    
 Define a list of top-level directories beneath your 'root' directory that
 should always be served in static mode.  Regular expressions may be
 specified using qr//.
 
-    mime_types => {
-        jpg => 'images/jpg',
-        png => 'image/png',
-    }    
+    MyApp->config->{static}->{dirs} => [
+        'static',
+        qr/^(images|css)/,
+    ]
     
 To override or add to the default MIME types set by the MIME::Types module,
 you may enter your own extension to MIME type mapping. 
 
-    debug => 1
+    MyApp->config->{static}->{mime_types} => {
+        jpg => 'images/jpg',
+        png => 'image/png',
+    }    
     
-This will print additional debugging information to the Catalyst log.  This
+Enable additional debugging information printed in the Catalyst log.  This
 is automatically enabled when running Catalyst in -Debug mode.
+
+    MyApp->config->{static}->{debug} => 1
 
 =cut
 
@@ -94,6 +94,22 @@ sub dispatch {
 
 sub finalize {
     my $c = shift;
+    
+    # return DECLINED when under mod_perl
+    if ( $c->_served_static && $c->engine =~ /Apache::MP(\d{2})/ ) {
+        my $engine = $1;
+        $c->log->debug( "Static::Simple: returning DECLINED to Apache" )
+            if ( $c->config->{static}->{debug} );
+        no strict 'subs';
+        if ( $engine == 13 ) {
+            return Apache::Constants::DECLINED;
+        } elsif ( $engine == 19 ) {
+            return Apache::Const::DECLINED;
+        } elsif ( $engine == 20 ) {
+            return Apache2::Const::DECLINED;
+        }
+    }
+    
     if ( $c->res->status =~ /^(1\d\d|[23]04)$/ ) {
         $c->res->headers->remove_content_headers;
         return $c->finalize_headers;
@@ -141,6 +157,15 @@ sub _ext_to_type {
 sub _serve_static {
     my ( $c, $type ) = @_;
     
+    # abort if running under mod_perl
+    # note that we do not use the Apache method if the user has defined
+    # custom MIME types, as Apache would not know about them
+    if ( $c->engine =~ /Apache/ && 
+         !keys %{ $c->config->{static}->{mime_types} } ) {
+        $c->_served_static( 1 );
+        return undef;
+    }
+    
     my $path = $c->req->path;
     
     unless ( -f $c->config->{root} . '/' . $path ) {
@@ -171,7 +196,7 @@ sub _serve_static {
     $c->res->output( $content );
     return 1;  
 }
-
+    
 =head1 SEE ALSO
 
 L<Catalyst>, L<Catalyst::Plugin::Static>, L<http://www.iana.org/assignments/media-types/>
