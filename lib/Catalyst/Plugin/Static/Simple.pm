@@ -7,10 +7,10 @@ use File::stat;
 use MIME::Types;
 use NEXT;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
-__PACKAGE__->mk_classdata('_mime_types');
-__PACKAGE__->mk_accessors('_served_static');
+__PACKAGE__->mk_classdata( qw/_mime_types/ );
+__PACKAGE__->mk_accessors( qw/_static_file _apache_mode/ );
 
 =head1 NAME
 
@@ -20,7 +20,7 @@ Catalyst::Plugin::Static::Simple - Make serving static pages painless.
 
     use Catalyst;
     MyApp->setup( qw/Static::Simple/ );
-    
+
 =head1 DESCRIPTION
 
 The Static::Simple plugin is designed to make serving static content in your
@@ -39,31 +39,80 @@ properly.
 You may further tweak the operation by adding configuration options, described
 below.
 
-=head1 CONFIGURATION
+=head1 ADVANCED CONFIGURATION
 
 Configuration is completely optional and is specified within MyApp->config->{static}.
+If you use any of these options, the module will probably feel less "simple" to you!
+
+=over 4
+
+=item Forcing directories into static mode
 
 Define a list of top-level directories beneath your 'root' directory that
 should always be served in static mode.  Regular expressions may be
 specified using qr//.
 
-    MyApp->config->{static}->{dirs} => [
+    MyApp->config->{static}->{dirs} = [
         'static',
         qr/^(images|css)/,
-    ]
+    ];
+
+=item Including additional directories (experimental!)
+
+You may specify a list of directories in which to search for your static files.  The
+directories will be searched in order and will return the first file found.  Note that
+your root directory is B<not> automatically added to the search path when
+you specify an include_path.  You should use MyApp->config->{root} to add it.
+
+    MyApp->config->{static}->{include_path} = [
+        '/path/to/overlay',
+        \&incpath_generator,
+        MyApp->config->{root}
+    ];
     
+With the above setting, a request for the file /images/logo.jpg will search for the
+following files, returning the first one found:
+
+    /path/to/overlay/images/logo.jpg
+    /dynamic/path/images/logo.jpg
+    /your/app/home/root/images/logo.jpg
+    
+The include path can contain a subroutine reference to dynamically return a list of
+available directories.  This method will receive the $c object as a parameter and
+should return a reference to a list of directories.  Errors can be reported using
+die().  This method will be called every time a file is requested that appears to
+be a static file (i.e. it has an extension).
+
+For example:
+
+    sub incpath_generator {
+        my $c = shift;
+        
+        if ( $c->session->{customer_dir} ) {
+            return [ $c->session->{customer_dir} ];
+        } else {
+            die "No customer dir defined.";
+        }
+    }
+
+=item Custom MIME types
+
 To override or add to the default MIME types set by the MIME::Types module,
 you may enter your own extension to MIME type mapping. 
 
-    MyApp->config->{static}->{mime_types} => {
+    MyApp->config->{static}->{mime_types} = {
         jpg => 'images/jpg',
         png => 'image/png',
-    }    
-    
+    };
+
+=item Debugging information
+
 Enable additional debugging information printed in the Catalyst log.  This
 is automatically enabled when running Catalyst in -Debug mode.
 
-    MyApp->config->{static}->{debug} => 1
+    MyApp->config->{static}->{debug} = 1;
+
+=back
 
 =cut
 
@@ -78,12 +127,19 @@ sub dispatch {
         if ( $path =~ $re ) {
             $c->log->debug( "Static::Simple: Serving from defined directory" )
                 if ( $c->config->{static}->{debug} );
-            return $c->_serve_static;
+            if ( $c->_locate_static_file ) {
+                return $c->_serve_static;
+            } else {
+                $c->log->debug( "Static::Simple: File not found: $path" )
+                    if ( $c->config->{static}->{debug} );
+                    $c->res->status( 404 );
+                return 0;
+            }
         }
     }
     
     # is this a real file?
-    if ( -f $c->config->{root} . '/' . $path ) {
+    if ( $c->_locate_static_file ) {
         if ( my $type = $c->_ext_to_type ) {
             return $c->_serve_static( $type );
         }
@@ -96,8 +152,7 @@ sub finalize {
     my $c = shift;
     
     # return DECLINED when under mod_perl
-    if ( $c->_served_static && $c->engine =~ /Apache::MP(\d{2})/ ) {
-        my $engine = $1;
+    if ( my $engine = $c->_apache_mode ) {
         $c->log->debug( "Static::Simple: returning DECLINED to Apache" )
             if ( $c->config->{static}->{debug} );
         no strict 'subs';
@@ -123,12 +178,47 @@ sub setup {
     $c->NEXT::setup(@_);
     
     $c->config->{static}->{dirs} ||= [];
+    $c->config->{static}->{include_path} ||= [ $c->config->{root} ];
     $c->config->{static}->{mime_types} ||= {};
     $c->config->{static}->{debug} ||= $c->debug;
     
     # load up a MIME::Types object, only loading types with
     # at least 1 file extension
     $c->_mime_types( MIME::Types->new( only_complete => 1 ) );
+}
+
+# Search through all included directories for the static file
+# Based on Template Toolkit INCLUDE_PATH code
+sub _locate_static_file {
+    my $c = shift;
+    
+    my $path = $c->req->path;
+    my @ipaths = @{ $c->config->{static}->{include_path} };
+    my $dpaths;
+    my $count = 64; # maximum number of directories to search
+    
+    while ( @ipaths && --$count) {
+        my $dir = shift @ipaths || next;
+        
+        if ( ref $dir eq 'CODE' ) {
+            eval { $dpaths = &$dir( $c ) };
+            if ($@) {
+                $c->log->error( "Static::Simple: " . $@ );
+            } else {
+                unshift( @ipaths, @$dpaths );
+                next;
+            }
+        } else {
+            $dir =~ s/\/$//;
+            if ( -d $dir && -f $dir . '/' . $path ) {
+                $c->log->debug( "Static::Simple: Serving file " . $dir . "/" . $path )
+                    if ( $c->config->{static}->{debug} );
+                return $c->_static_file( $dir . '/' . $path );
+            }
+        }
+    }
+    
+    return undef;
 }
 
 sub _ext_to_type {
@@ -157,27 +247,21 @@ sub _ext_to_type {
 sub _serve_static {
     my ( $c, $type ) = @_;
     
+    my $path = $c->req->path;    
+    
     # abort if running under mod_perl
     # note that we do not use the Apache method if the user has defined
-    # custom MIME types, as Apache would not know about them
-    if ( $c->engine =~ /Apache/ && 
-         !keys %{ $c->config->{static}->{mime_types} } ) {
-        $c->_served_static( 1 );
-        return undef;
-    }
-    
-    my $path = $c->req->path;
-    
-    unless ( -f $c->config->{root} . '/' . $path ) {
-        $c->log->debug( "Static::Simple: File not found: $path" )
-            if ( $c->config->{static}->{debug} );
-        $c->res->status( 404 );
-        return 0;
+    # custom MIME types or is using include paths, as Apache would not know about them
+    if ( $c->engine =~ /Apache::MP(\d{2})/ && 
+         !keys %{ $c->config->{static}->{mime_types} } &&
+         $c->_static_file eq $c->config->{root} . '/' . $path ) {
+             $c->_apache_mode( $1 );
+             return undef;
     }
     
     $type = $c->_ext_to_type unless ( $type );
     
-    $path = $c->config->{root} . '/' . $path;    
+    $path = $c->_static_file;
     my $stat = stat( $path );
 
     # the below code all from C::P::Static
@@ -209,11 +293,13 @@ Andy Grundman, C<andy@hybridized.org>
 
 The authors of Catalyst::Plugin::Static:
 
-Sebastian Riedel, C<sri@cpan.org>
+    Sebastian Riedel
+    Christian Hansen
+    Marcus Ramberg
 
-Christian Hansen, C<ch@ngmedia.com>
+For the include_path code from Template Toolkit:
 
-Marcus Ramberg, C<mramberg@cpan.org>
+    Andy Wardley
 
 =head1 COPYRIGHT
 

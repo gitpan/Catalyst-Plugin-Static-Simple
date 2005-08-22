@@ -4,7 +4,7 @@ NAME
 SYNOPSIS
         use Catalyst;
         MyApp->setup( qw/Static::Simple/ );
-    
+
 DESCRIPTION
     The Static::Simple plugin is designed to make serving static content in
     your application during development quick and easy, without requiring a
@@ -22,31 +22,74 @@ DESCRIPTION
     You may further tweak the operation by adding configuration options,
     described below.
 
-CONFIGURATION
+ADVANCED CONFIGURATION
     Configuration is completely optional and is specified within
-    MyApp->config->{static}.
+    MyApp->config->{static}. If you use any of these options, the module
+    will probably feel less "simple" to you!
 
-    Define a list of top-level directories beneath your 'root' directory
-    that should always be served in static mode. Regular expressions may be
-    specified using qr//.
+    Forcing directories into static mode
+        Define a list of top-level directories beneath your 'root' directory
+        that should always be served in static mode. Regular expressions may
+        be specified using qr//.
 
-        MyApp->config->{static}->{dirs} => [
-            'static',
-            qr/^(images|css)/,
-        ]
+            MyApp->config->{static}->{dirs} = [
+                'static',
+                qr/^(images|css)/,
+            ];
+
+    Including additional directories (experimental!)
+        You may specify a list of directories in which to search for your
+        static files. The directories will be searched in order and will
+        return the first file found. Note that your root directory is not
+        automatically added to the search path when you specify an
+        include_path. You should use MyApp->config->{root} to add it.
+
+            MyApp->config->{static}->{include_path} = [
+                '/path/to/overlay',
+                \&incpath_generator,
+                MyApp->config->{root}
+            ];
     
-    To override or add to the default MIME types set by the MIME::Types
-    module, you may enter your own extension to MIME type mapping.
+        With the above setting, a request for the file /images/logo.jpg will
+        search for the following files, returning the first one found:
 
-        MyApp->config->{static}->{mime_types} => {
-            jpg => 'images/jpg',
-            png => 'image/png',
-        }    
+            /path/to/overlay/images/logo.jpg
+            /dynamic/path/images/logo.jpg
+            /your/app/home/root/images/logo.jpg
     
-    Enable additional debugging information printed in the Catalyst log.
-    This is automatically enabled when running Catalyst in -Debug mode.
+        The include path can contain a subroutine reference to dynamically
+        return a list of available directories. This method will receive the
+        $c object as a parameter and should return a reference to a list of
+        directories. Errors can be reported using die(). This method will be
+        called every time a file is requested that appears to be a static
+        file (i.e. it has an extension).
 
-        MyApp->config->{static}->{debug} => 1
+        For example:
+
+            sub incpath_generator {
+                my $c = shift;
+        
+                if ( $c->session->{customer_dir} ) {
+                    return [ $c->session->{customer_dir} ];
+                } else {
+                    die "No customer dir defined.";
+                }
+            }
+
+    Custom MIME types
+        To override or add to the default MIME types set by the MIME::Types
+        module, you may enter your own extension to MIME type mapping.
+
+            MyApp->config->{static}->{mime_types} = {
+                jpg => 'images/jpg',
+                png => 'image/png',
+            };
+
+    Debugging information
+        Enable additional debugging information printed in the Catalyst log.
+        This is automatically enabled when running Catalyst in -Debug mode.
+
+            MyApp->config->{static}->{debug} = 1;
 
 SEE ALSO
     Catalyst, Catalyst::Plugin::Static,
@@ -58,11 +101,13 @@ AUTHOR
 THANKS
     The authors of Catalyst::Plugin::Static:
 
-    Sebastian Riedel, "sri@cpan.org"
+        Sebastian Riedel
+        Christian Hansen
+        Marcus Ramberg
 
-    Christian Hansen, "ch@ngmedia.com"
+    For the include_path code from Template Toolkit:
 
-    Marcus Ramberg, "mramberg@cpan.org"
+        Andy Wardley
 
 COPYRIGHT
     This program is free software, you can redistribute it and/or modify it

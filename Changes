@@ -1,5 +1,11 @@
 Revision history for Perl extension Catalyst::Plugin::Static::Simple
 
+0.03    2005-08-21 23:50:00
+        - Added config option for include_path to allow for multiple 
+          directories with static files.  This option should be
+          considered experimental!
+        - Documentation cleanups.
+
 0.02    2005-08-16 18:00:00
         - Return DECLINED when running under mod_perl to allow Apache to
           serve the static file.  This is not done when any custom MIME
