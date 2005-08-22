@@ -81,7 +81,7 @@ ADVANCED CONFIGURATION
         module, you may enter your own extension to MIME type mapping.
 
             MyApp->config->{static}->{mime_types} = {
-                jpg => 'images/jpg',
+                jpg => 'image/jpg',
                 png => 'image/png',
             };
 

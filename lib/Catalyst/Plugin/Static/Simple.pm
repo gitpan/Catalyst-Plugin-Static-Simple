@@ -7,10 +7,10 @@ use File::stat;
 use MIME::Types;
 use NEXT;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 __PACKAGE__->mk_classdata( qw/_mime_types/ );
-__PACKAGE__->mk_accessors( qw/_static_file _apache_mode/ );
+__PACKAGE__->mk_accessors( qw/_static_file _apache_mode _debug_message/ );
 
 =head1 NAME
 
@@ -101,7 +101,7 @@ To override or add to the default MIME types set by the MIME::Types module,
 you may enter your own extension to MIME type mapping. 
 
     MyApp->config->{static}->{mime_types} = {
-        jpg => 'images/jpg',
+        jpg => 'image/jpg',
         png => 'image/png',
     };
 
@@ -125,23 +125,24 @@ sub dispatch {
     foreach my $dir ( @{ $c->config->{static}->{dirs} } ) {
         my $re = ( $dir =~ /^qr\// ) ? eval $dir : qr/^${dir}/;
         if ( $path =~ $re ) {
-            $c->log->debug( "Static::Simple: Serving from defined directory" )
-                if ( $c->config->{static}->{debug} );
             if ( $c->_locate_static_file ) {
+                $c->_debug_msg( "from static directory" )
+                    if ( $c->config->{static}->{debug} );
                 return $c->_serve_static;
             } else {
-                $c->log->debug( "Static::Simple: File not found: $path" )
+                $c->_debug_msg( "404: file not found: $path" )
                     if ( $c->config->{static}->{debug} );
-                    $c->res->status( 404 );
+                $c->res->status( 404 );
                 return 0;
             }
         }
     }
     
-    # is this a real file?
-    if ( $c->_locate_static_file ) {
-        if ( my $type = $c->_ext_to_type ) {
-            return $c->_serve_static( $type );
+    # Does the path have an extension?
+    if ( $path =~ /.*\.(\S{1,})$/ ) {
+        # and does it exist?
+        if ( $c->_locate_static_file ) {
+            return $c->_serve_static;
         }
     }
     
@@ -151,10 +152,15 @@ sub dispatch {
 sub finalize {
     my $c = shift;
     
+    # display all log messages
+    if ( $c->config->{static}->{debug} && scalar @{$c->_debug_msg} ) {
+        $c->log->debug( "Static::Simple: Serving " .
+            join( " ", @{$c->_debug_msg} )
+        );
+    }
+    
     # return DECLINED when under mod_perl
     if ( my $engine = $c->_apache_mode ) {
-        $c->log->debug( "Static::Simple: returning DECLINED to Apache" )
-            if ( $c->config->{static}->{debug} );
         no strict 'subs';
         if ( $engine == 13 ) {
             return Apache::Constants::DECLINED;
@@ -193,6 +199,7 @@ sub _locate_static_file {
     my $c = shift;
     
     my $path = $c->req->path;
+    
     my @ipaths = @{ $c->config->{static}->{include_path} };
     my $dpaths;
     my $count = 64; # maximum number of directories to search
@@ -203,7 +210,7 @@ sub _locate_static_file {
         if ( ref $dir eq 'CODE' ) {
             eval { $dpaths = &$dir( $c ) };
             if ($@) {
-                $c->log->error( "Static::Simple: " . $@ );
+                $c->log->error( "Static::Simple: include_path error: " . $@ );
             } else {
                 unshift( @ipaths, @$dpaths );
                 next;
@@ -211,7 +218,7 @@ sub _locate_static_file {
         } else {
             $dir =~ s/\/$//;
             if ( -d $dir && -f $dir . '/' . $path ) {
-                $c->log->debug( "Static::Simple: Serving file " . $dir . "/" . $path )
+                $c->_debug_msg( $dir . "/" . $path )
                     if ( $c->config->{static}->{debug} );
                 return $c->_static_file( $dir . '/' . $path );
             }
@@ -231,21 +238,23 @@ sub _ext_to_type {
         my $ext = $1;
         my $user_types = $c->config->{static}->{mime_types};
         if ( $type = $user_types->{$ext} || $c->_mime_types->mimeTypeOf( $ext ) ) {
-            $c->log->debug( "Static::Simple: Serving known file extension '$ext' as $type" )
+            $c->_debug_msg( "as $type" )
                 if ( $c->config->{static}->{debug} );            
             return $type;
         } else {
-            $type = 'text/plain';
-            $c->log->debug( "Static::Simple: Unknown file extension '$ext', serving as text/plain" )
+            $c->_debug_msg( "as text/plain (unknown extension $ext)" )
                 if ( $c->config->{static}->{debug} );
+            return 'text/plain';
         }
+    } else {
+        $c->_debug_msg( "as text/plain (no extension)" )
+            if ( $c->config->{static}->{debug} );
+        return 'text/plain';
     }
-    
-    return undef;
 }
 
 sub _serve_static {
-    my ( $c, $type ) = @_;
+    my $c = shift;
     
     my $path = $c->req->path;    
     
@@ -255,11 +264,13 @@ sub _serve_static {
     if ( $c->engine =~ /Apache::MP(\d{2})/ && 
          !keys %{ $c->config->{static}->{mime_types} } &&
          $c->_static_file eq $c->config->{root} . '/' . $path ) {
+             $c->_debug_msg( "DECLINED to Apache" )
+                if ( $c->config->{static}->{debug} );          
              $c->_apache_mode( $1 );
              return undef;
     }
     
-    $type = $c->_ext_to_type unless ( $type );
+    my $type = $c->_ext_to_type;
     
     $path = $c->_static_file;
     my $stat = stat( $path );
@@ -279,6 +290,16 @@ sub _serve_static {
     $c->res->headers->last_modified( $stat->mtime );
     $c->res->output( $content );
     return 1;  
+}
+
+sub _debug_msg {
+    my ( $c, $msg ) = @_;
+    
+    $c->_debug_message( [] ) unless ( $c->_debug_message );
+    
+    push @{ $c->_debug_message }, $msg if $msg;
+    
+    return $c->_debug_message;
 }
     
 =head1 SEE ALSO

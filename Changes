@@ -1,5 +1,12 @@
 Revision history for Perl extension Catalyst::Plugin::Static::Simple
 
+0.04    2005-08-22 12:00:00
+        - Fixed bug where static files were searched for on every request
+          even without a file extension.
+        - Fixed bug where files without extensions in defined static dirs
+          were not served with text/plain.
+        - Consolidated the debug log messages.
+
 0.03    2005-08-21 23:50:00
         - Added config option for include_path to allow for multiple 
           directories with static files.  This option should be
