@@ -7,7 +7,7 @@ use File::stat;
 use MIME::Types;
 use NEXT;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 __PACKAGE__->mk_classdata( qw/_mime_types/ );
 __PACKAGE__->mk_accessors( qw/_static_file _apache_mode _debug_message/ );
@@ -104,6 +104,31 @@ you may enter your own extension to MIME type mapping.
         jpg => 'image/jpg',
         png => 'image/png',
     };
+    
+=item Apache integration and performance
+
+Optionally, when running under mod_perl, Static::Simple can return DECLINED
+on static files to allow Apache to serve the file.  A check is first done to
+make sure that Apache's DocumentRoot matches your Catalyst root, and that you
+are not using any custom MIME types or multiple roots.  To enable the Apache
+support, you can set the following option.
+
+    MyApp->config->{static}->{use_apache} = 1;
+    
+By default this option is disabled because after several benchmarks it
+appears that just serving the file from Catalyst is the better option.  On a 3K
+file, Catalyst appears to be around 25% faster, and is 42% faster on a 10K file.
+My benchmarking was done using the following 'siege' command, so other
+benchmarks would be welcome!
+
+    siege -u http://server/static/css/10K.css b -t 1M -c 1
+
+For best static performance, you should still serve your static files directly
+from Apache by defining a Location block similar to the following:
+
+    <Location /static>
+        SetHandler default-handler
+    </Location>
 
 =item Debugging information
 
@@ -160,7 +185,8 @@ sub finalize {
     }
     
     # return DECLINED when under mod_perl
-    if ( my $engine = $c->_apache_mode ) {
+    if ( $c->config->{static}->{use_apache} && $c->_apache_mode ) {
+        my $engine = $c->_apache_mode;
         no strict 'subs';
         if ( $engine == 13 ) {
             return Apache::Constants::DECLINED;
@@ -186,11 +212,14 @@ sub setup {
     $c->config->{static}->{dirs} ||= [];
     $c->config->{static}->{include_path} ||= [ $c->config->{root} ];
     $c->config->{static}->{mime_types} ||= {};
+    $c->config->{static}->{use_apache} ||= 0; 
     $c->config->{static}->{debug} ||= $c->debug;
     
     # load up a MIME::Types object, only loading types with
     # at least 1 file extension
     $c->_mime_types( MIME::Types->new( only_complete => 1 ) );
+    # preload the type index hash so it's not built on the first request
+    $c->_mime_types->create_type_index;
 }
 
 # Search through all included directories for the static file
@@ -261,13 +290,23 @@ sub _serve_static {
     # abort if running under mod_perl
     # note that we do not use the Apache method if the user has defined
     # custom MIME types or is using include paths, as Apache would not know about them
-    if ( $c->engine =~ /Apache::MP(\d{2})/ && 
-         !keys %{ $c->config->{static}->{mime_types} } &&
-         $c->_static_file eq $c->config->{root} . '/' . $path ) {
-             $c->_debug_msg( "DECLINED to Apache" )
-                if ( $c->config->{static}->{debug} );          
-             $c->_apache_mode( $1 );
-             return undef;
+    if ( $c->config->{static}->{use_apache} ) {
+        if ( $c->engine =~ /Apache::MP(\d{2})/ && 
+             !keys %{ $c->config->{static}->{mime_types} } &&
+             $c->_static_file eq $c->config->{root} . '/' . $path ) {
+                 
+                 # check that Apache will serve the correct file
+                 if ( $c->apache->document_root ne $c->config->{root} ) {
+                     $c->log->warn( "Static::Simple: Your Apache DocumentRoot must be set to " .
+                        $c->config->{root} . " to use the Apache feature.  Yours is currently " .
+                        $c->apache->document_root );
+                 } else {
+                     $c->_debug_msg( "DECLINED to Apache" )
+                        if ( $c->config->{static}->{debug} );          
+                     $c->_apache_mode( $1 );
+                     return undef;
+                 }
+        }
     }
     
     my $type = $c->_ext_to_type;

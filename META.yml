@@ -1,6 +1,6 @@
 ---
 name: Catalyst-Plugin-Static-Simple
-version: 0.04
+version: 0.05
 author:
   - 'Andy Grundman, C<andy@hybridized.org>'
 abstract: Make serving static pages painless.
@@ -12,5 +12,5 @@ requires:
 provides:
   Catalyst::Plugin::Static::Simple:
     file: lib/Catalyst/Plugin/Static/Simple.pm
-    version: 0.04
+    version: 0.05
 generated_by: Module::Build version 0.2611

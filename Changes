@@ -1,5 +1,15 @@
 Revision history for Perl extension Catalyst::Plugin::Static::Simple
 
+0.05    2005-08-26 12:00:00
+        - Added use_apache option to enable the Apache DECLINED
+          support.  Default is disabled as it appears Catalyst is
+          faster at serving the files!
+        - Added a check that Apache's DocumentRoot matches Catalyst's
+          root before serving DECLINED.
+        - Preload MIME::Types index during setup() so it's not built on
+          the first request.
+        - Added a note on performance of Apache vs. Catalyst.
+
 0.04    2005-08-22 12:00:00
         - Fixed bug where static files were searched for on every request
           even without a file extension.

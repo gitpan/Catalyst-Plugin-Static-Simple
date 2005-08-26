@@ -84,6 +84,32 @@ ADVANCED CONFIGURATION
                 jpg => 'image/jpg',
                 png => 'image/png',
             };
+    
+    Apache integration and performance
+        Optionally, when running under mod_perl, Static::Simple can return
+        DECLINED on static files to allow Apache to serve the file. A check
+        is first done to make sure that Apache's DocumentRoot matches your
+        Catalyst root, and that you are not using any custom MIME types or
+        multiple roots. To enable the Apache support, you can set the
+        following option.
+
+            MyApp->config->{static}->{use_apache} = 1;
+    
+        By default this option is disabled because after several benchmarks
+        it appears that just serving the file from Catalyst is the better
+        option. On a 3K file, Catalyst appears to be around 25% faster, and
+        is 42% faster on a 10K file. My benchmarking was done using the
+        following 'siege' command, so other benchmarks would be welcome!
+
+            siege -u http://server/static/css/10K.css b -t 1M -c 1
+
+        For best static performance, you should still serve your static
+        files directly from Apache by defining a Location block similar to
+        the following:
+
+            <Location /static>
+                SetHandler default-handler
+            </Location>
 
     Debugging information
         Enable additional debugging information printed in the Catalyst log.
