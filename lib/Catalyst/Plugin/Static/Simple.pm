@@ -7,7 +7,7 @@ use File::stat;
 use MIME::Types;
 use NEXT;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 __PACKAGE__->mk_classdata( qw/_mime_types/ );
 __PACKAGE__->mk_accessors( qw/_static_file
@@ -291,9 +291,7 @@ Configuration is completely optional and is specified within
 MyApp->config->{static}.  If you use any of these options, the module will
 probably feel less "simple" to you!
 
-=over 4
-
-=item Forcing directories into static mode
+=head2 Forcing directories into static mode
 
 Define a list of top-level directories beneath your 'root' directory that
 should always be served in static mode.  Regular expressions may be
@@ -304,7 +302,7 @@ specified using qr//.
         qr/^(images|css)/,
     ];
 
-=item Including additional directories (experimental!)
+=head2 Including additional directories (experimental!)
 
 You may specify a list of directories in which to search for your static
 files.  The directories will be searched in order and will return the first
@@ -343,7 +341,7 @@ For example:
         }
     }
 
-=item Custom MIME types
+=head2 Custom MIME types
 
 To override or add to the default MIME types set by the MIME::Types module,
 you may enter your own extension to MIME type mapping. 
@@ -352,8 +350,8 @@ you may enter your own extension to MIME type mapping.
         jpg => 'image/jpg',
         png => 'image/png',
     };
-    
-=item Apache integration and performance
+
+=head2 Apache integration and performance
 
 Optionally, when running under mod_perl, Static::Simple can return DECLINED
 on static files to allow Apache to serve the file.  A check is first done to
@@ -377,8 +375,8 @@ from Apache by defining a Location block similar to the following:
     <Location /static>
         SetHandler default-handler
     </Location>
-    
-=item Bypassing other plugins
+
+=head2 Bypassing other plugins
 
 This plugin checks for a static file in the prepare_action stage.  If the
 request is for a static file, it will bypass all remaining prepare_action
@@ -390,15 +388,13 @@ to run even on static files, list them before Static::Simple.
 Currently, work done by plugins in any other prepare method will execute
 normally.
 
-=item Debugging information
+=head2 Debugging information
 
 Enable additional debugging information printed in the Catalyst log.  This
 is automatically enabled when running Catalyst in -Debug mode.
 
     MyApp->config->{static}->{debug} = 1;
 
-=back
-    
 =head1 SEE ALSO
 
 L<Catalyst>, L<Catalyst::Plugin::Static>, 
