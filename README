@@ -84,7 +84,7 @@ ADVANCED CONFIGURATION
             jpg => 'image/jpg',
             png => 'image/png',
         };
-    
+
   Apache integration and performance
     Optionally, when running under mod_perl, Static::Simple can return
     DECLINED on static files to allow Apache to serve the file. A check is
