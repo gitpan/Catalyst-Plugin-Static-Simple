@@ -7,7 +7,7 @@ use File::stat;
 use MIME::Types;
 use NEXT;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 __PACKAGE__->mk_classdata( qw/_static_mime_types/ );
 __PACKAGE__->mk_accessors( qw/_static_file
@@ -46,7 +46,7 @@ sub prepare_action {
         return if ( $c->_locate_static_file );
     }
     
-    return $c->NEXT::prepare_action(@_);
+    return $c->NEXT::ACTUAL::prepare_action(@_);
 }
 
 # dispatch takes the file found during prepare_action and serves it
@@ -56,10 +56,13 @@ sub dispatch {
     return if ( $c->res->status != 200 );
     
     if ( $c->_static_file ) {
+        if ( $c->config->{static}->{no_logs} && $c->log->can('abort') ) {
+           $c->log->abort( 1 );
+        }
         return $c->_serve_static;
     }
     else {
-        return $c->NEXT::dispatch(@_);
+        return $c->NEXT::ACTUAL::dispatch(@_);
     }
 }
 
@@ -69,9 +72,8 @@ sub finalize {
     
     # display all log messages
     if ( $c->config->{static}->{debug} && scalar @{$c->_debug_msg} ) {
-        $c->log->debug( "Static::Simple: Serving " .
-            join( " ", @{$c->_debug_msg} )
-        );
+	$c->log->debug( "Static::Simple: " .
+	    join( " ", @{$c->_debug_msg} ) );
     }
     
     # return DECLINED when under mod_perl
@@ -94,7 +96,7 @@ sub finalize {
         return $c->finalize_headers;
     }
     
-    return $c->NEXT::finalize(@_);
+    return $c->NEXT::ACTUAL::finalize(@_);
 }
 
 sub setup {
@@ -105,8 +107,13 @@ sub setup {
     $c->config->{static}->{dirs} ||= [];
     $c->config->{static}->{include_path} ||= [ $c->config->{root} ];
     $c->config->{static}->{mime_types} ||= {};
-    $c->config->{static}->{use_apache} ||= 0; 
+    $c->config->{static}->{ignore_extensions} ||= [ qw/tt html xhtml/ ];
+    $c->config->{static}->{ignore_dirs} ||= [];
+    $c->config->{static}->{use_apache} ||= 0;
     $c->config->{static}->{debug} ||= $c->debug;
+    if ( ! defined $c->config->{static}->{no_logs} ) {
+        $c->config->{static}->{no_logs} = 1;
+    }
     
     # load up a MIME::Types object, only loading types with
     # at least 1 file extension
@@ -127,8 +134,9 @@ sub _locate_static_file {
     my $dpaths;
     my $count = 64; # maximum number of directories to search
     
+    DIR_CHECK:
     while ( @ipaths && --$count) {
-        my $dir = shift @ipaths || next;
+        my $dir = shift @ipaths || next DIR_CHECK;
         
         if ( ref $dir eq 'CODE' ) {
             eval { $dpaths = &$dir( $c ) };
@@ -136,12 +144,33 @@ sub _locate_static_file {
                 $c->log->error( "Static::Simple: include_path error: " . $@ );
             } else {
                 unshift( @ipaths, @$dpaths );
-                next;
+                next DIR_CHECK;
             }
         } else {
             $dir =~ s/\/$//xms;
             if ( -d $dir && -f $dir . '/' . $path ) {
-                $c->_debug_msg( $dir . "/" . $path )
+                
+                # do we need to ignore the file?
+                for my $ignore ( @{ $c->config->{static}->{ignore_dirs} } ) {
+                    $ignore =~ s{/$}{};
+                    if ( $path =~ /^$ignore\// ) {
+                        $c->_debug_msg( "Ignoring directory `$ignore`" )
+                            if ( $c->config->{static}->{debug} );
+                        next DIR_CHECK;
+                    }
+                }
+                
+                # do we need to ignore based on extension?
+                for my $ignore_ext 
+                    ( @{ $c->config->{static}->{ignore_extensions} } ) {
+                        if ( $path =~ /.*\.${ignore_ext}$/ixms ) {
+                            $c->_debug_msg( "Ignoring extension `$ignore_ext`" )
+                                if ( $c->config->{static}->{debug} );
+                            next DIR_CHECK;
+                        }
+                }
+                
+                $c->_debug_msg( 'Serving ' . $dir . '/' . $path )
                     if ( $c->config->{static}->{debug} );
                 return $c->_static_file( $dir . '/' . $path );
             }
@@ -176,14 +205,14 @@ sub _serve_static {
     
              # check that Apache will serve the correct file
              if ( $c->apache->document_root ne $c->config->{root} ) {
-                 $c->log->warn( "Static::Simple: Your Apache DocumentRoot"
-                              . " must be set to " . $c->config->{root} 
-                              . " to use the Apache feature.  Yours is"
-                              . " currently " . $c->apache->document_root
+                 $c->log->warn( 'Static::Simple: Your Apache DocumentRoot'
+                              . ' must be set to ' . $c->config->{root} 
+                              . ' to use the Apache feature.  Yours is'
+                              . ' currently ' . $c->apache->document_root
                               );
              }
              else {
-                 $c->_debug_msg( "DECLINED to Apache" )
+                 $c->_debug_msg( 'DECLINED to Apache' )
                     if ( $c->config->{static}->{debug} );          
                  $c->_static_apache_mode( $engine );
                  return;
@@ -291,6 +320,13 @@ Configuration is completely optional and is specified within
 MyApp->config->{static}.  If you use any of these options, the module will
 probably feel less "simple" to you!
 
+=head2 Aborting request logging
+
+Since Catalyst 5.50, there has been added support for dropping logging for a 
+request. This is enabled by default for static files, as static requests tend
+to clutter the log output.  However, if you want logging of static requests, 
+you can enable it by setting MyApp->config->{static}->{no_logs} to 0.
+
 =head2 Forcing directories into static mode
 
 Define a list of top-level directories beneath your 'root' directory that
@@ -302,7 +338,7 @@ specified using qr//.
         qr/^(images|css)/,
     ];
 
-=head2 Including additional directories (experimental!)
+=head2 Including additional directories
 
 You may specify a list of directories in which to search for your static
 files.  The directories will be searched in order and will return the first
@@ -340,6 +376,35 @@ For example:
             die "No customer dir defined.";
         }
     }
+    
+=head2 Ignoring certain types of files
+
+There are some file types you may not wish to serve as static files.  Most
+important in this category are your raw template files.  By default, files
+with the extensions tt, html, and xhtml will be ignored by Static::Simple in
+the interest of security.  If you wish to define your own extensions to
+ignore, use the ignore_extensions option:
+
+    MyApp->config->{static}->{ignore_extensions} = [ qw/tt html xhtml/ ];
+    
+=head2 Ignoring entire directories
+
+To prevent an entire directory from being served statically, you can use the
+ignore_dirs option.  This option contains a list of relative directory paths
+to ignore.  If using include_path, the path will be checked against every
+included path.
+
+    MyApp->config->{static}->{ignore_dirs} = [ qw/tmpl css/ ];
+    
+For example, if combined with the above include_path setting, this
+ignore_dirs value will ignore the following directories if they exist:
+
+    /path/to/overlay/tmpl
+    /path/to/overlay/css
+    /dynamic/path/tmpl
+    /dynamic/path/css
+    /your/app/home/root/tmpl
+    /your/app/home/root/css    
 
 =head2 Custom MIME types
 
@@ -403,6 +468,10 @@ L<http://www.iana.org/assignments/media-types/>
 =head1 AUTHOR
 
 Andy Grundman, <andy@hybridized.org>
+
+=head1 CONTRIBUTORS
+
+Marcus Ramberg, <mramberg@cpan.org>
 
 =head1 THANKS
 
