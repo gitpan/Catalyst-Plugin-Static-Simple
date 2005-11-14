@@ -4,21 +4,16 @@ use strict;
 use warnings;
 use base qw/Class::Accessor::Fast Class::Data::Inheritable/;
 use File::stat;
+use IO::File;
 use MIME::Types;
 use NEXT;
 
-if ( Catalyst->VERSION le '5.33' ) {
-    require File::Slurp;
-}
-
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 __PACKAGE__->mk_classdata( qw/_static_mime_types/ );
 __PACKAGE__->mk_accessors( qw/_static_file
                               _static_debug_message/ );
 
-# prepare_action is used to first check if the request path is a static file.
-# If so, we skip all other prepare_action steps to improve performance.
 sub prepare_action {
     my $c = shift;
     my $path = $c->req->path;
@@ -52,7 +47,6 @@ sub prepare_action {
     return $c->NEXT::ACTUAL::prepare_action(@_);
 }
 
-# dispatch takes the file found during prepare_action and serves it
 sub dispatch {
     my $c = shift;
     
@@ -69,7 +63,6 @@ sub dispatch {
     }
 }
 
-# finalize serves up final header information
 sub finalize {
     my $c = shift;
     
@@ -91,6 +84,10 @@ sub setup {
     
     $c->NEXT::setup(@_);
     
+    if ( Catalyst->VERSION le '5.33' ) {
+        require File::Slurp;
+    }
+    
     $c->config->{static}->{dirs} ||= [];
     $c->config->{static}->{include_path} ||= [ $c->config->{root} ];
     $c->config->{static}->{mime_types} ||= {};
@@ -99,7 +96,7 @@ sub setup {
     $c->config->{static}->{debug} ||= $c->debug;
     if ( ! defined $c->config->{static}->{no_logs} ) {
         $c->config->{static}->{no_logs} = 1;
-    }
+    }    
     
     # load up a MIME::Types object, only loading types with
     # at least 1 file extension
@@ -175,15 +172,6 @@ sub _serve_static {
     my $full_path = $c->_static_file;
     my $stat = stat $full_path;
 
-    # the below code all from C::P::Static
-    if ( $c->req->headers->if_modified_since ) {
-        if ( $c->req->headers->if_modified_since == $stat->mtime ) {
-            $c->res->status( 304 ); # Not Modified
-            $c->res->headers->remove_content_headers;
-            return 1;
-        }
-    }
-    
     $c->res->headers->content_type( $type );
     $c->res->headers->content_length( $stat->size );
     $c->res->headers->last_modified( $stat->mtime );
@@ -191,17 +179,19 @@ sub _serve_static {
     if ( Catalyst->VERSION le '5.33' ) {
         # old File::Slurp method
         my $content = File::Slurp::read_file( $full_path );
-        $c->res->output( $content );
+        $c->res->body( $content );
     }
     else {
-        # new write method
-        open my $fh, '<', $full_path 
-            or Catalyst::Exception->throw( 
-                message => "Unable to open $full_path for reading" );
-        while ( $fh->read( my $buffer, 4096 ) ) {
-            $c->res->write( $buffer );
+        # new method, pass an IO::File object to body
+        my $fh = IO::File->new( $full_path, 'r' );
+        if ( defined $fh ) {
+            binmode $fh;
+            $c->res->body( $fh );
         }
-        close $fh;
+        else {
+            Catalyst::Exception->throw( 
+                message => "Unable to open $full_path for reading" );
+        }
     }
     
     return 1;
@@ -220,7 +210,7 @@ sub _ext_to_type {
         if ( $type ) {
             $c->_debug_msg( "as $type" )
                 if ( $c->config->{static}->{debug} );            
-            return $type;
+            return ( ref $type ) ? $type->type : $type;
         }
         else {
             $c->_debug_msg( "as text/plain (unknown extension $ext)" )
@@ -411,6 +401,28 @@ directory.  This approach is recommended for production installations.
     <Location /static>
         SetHandler default-handler
     </Location>
+
+=head1 INTERNAL EXTENDED METHODS
+
+Static::Simple extends the following steps in the Catalyst process.
+
+=head2 prepare_action 
+
+prepare_action is used to first check if the request path is a static file.
+If so, we skip all other prepare_action steps to improve performance.
+
+=head2 dispatch
+
+dispatch takes the file found during prepare_action and writes it to the
+output.
+
+=head2 finalize
+
+finalize serves up final header information and displays any log messages.
+
+=head2 setup
+
+setup initializes all default values.
 
 =head1 SEE ALSO
 
