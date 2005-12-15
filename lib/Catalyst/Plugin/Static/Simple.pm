@@ -4,11 +4,12 @@ use strict;
 use warnings;
 use base qw/Class::Accessor::Fast Class::Data::Inheritable/;
 use File::stat;
+use File::Spec::Functions qw/catdir no_upwards splitdir/;
 use IO::File;
 use MIME::Types;
 use NEXT;
 
-our $VERSION = '0.11';
+our $VERSION = '0.13';
 
 __PACKAGE__->mk_classdata( qw/_static_mime_types/ );
 __PACKAGE__->mk_accessors( qw/_static_file
@@ -28,12 +29,10 @@ sub prepare_action {
             if ( $c->_locate_static_file ) {
                 $c->_debug_msg( 'from static directory' )
                     if ( $c->config->{static}->{debug} );
-                return;
             } else {
                 $c->_debug_msg( "404: file not found: $path" )
                     if ( $c->config->{static}->{debug} );
                 $c->res->status( 404 );
-                return;
             }
         }
     }
@@ -41,7 +40,7 @@ sub prepare_action {
     # Does the path have an extension?
     if ( $path =~ /.*\.(\S{1,})$/xms ) {
         # and does it exist?
-        return if ( $c->_locate_static_file );
+        $c->_locate_static_file;
     }
     
     return $c->NEXT::ACTUAL::prepare_action(@_);
@@ -91,7 +90,8 @@ sub setup {
     $c->config->{static}->{dirs} ||= [];
     $c->config->{static}->{include_path} ||= [ $c->config->{root} ];
     $c->config->{static}->{mime_types} ||= {};
-    $c->config->{static}->{ignore_extensions} ||= [ qw/tt tt2 html xhtml/ ];
+    $c->config->{static}->{ignore_extensions} 
+        ||= [ qw/tmpl tt tt2 html xhtml/ ];
     $c->config->{static}->{ignore_dirs} ||= [];
     $c->config->{static}->{debug} ||= $c->debug;
     if ( ! defined $c->config->{static}->{no_logs} ) {
@@ -111,7 +111,7 @@ sub setup {
 sub _locate_static_file {
     my $c = shift;
     
-    my $path = $c->req->path;
+    my $path = catdir( no_upwards( splitdir( $c->req->path ) ) );
     
     my @ipaths = @{ $c->config->{static}->{include_path} };
     my $dpaths;
@@ -130,13 +130,13 @@ sub _locate_static_file {
                 next DIR_CHECK;
             }
         } else {
-            $dir =~ s/\/$//xms;
+            $dir =~ s/(\/|\\)$//xms;
             if ( -d $dir && -f $dir . '/' . $path ) {
                 
                 # do we need to ignore the file?
                 for my $ignore ( @{ $c->config->{static}->{ignore_dirs} } ) {
-                    $ignore =~ s{/$}{};
-                    if ( $path =~ /^$ignore\// ) {
+                    $ignore =~ s{(/|\\)$}{};
+                    if ( $path =~ /^$ignore(\/|\\)/ ) {
                         $c->_debug_msg( "Ignoring directory `$ignore`" )
                             if ( $c->config->{static}->{debug} );
                         next DIR_CHECK;
@@ -336,11 +336,12 @@ For example:
 
 There are some file types you may not wish to serve as static files.  Most
 important in this category are your raw template files.  By default, files
-with the extensions tt, tt2, html, and xhtml will be ignored by Static::Simple
-in the interest of security.  If you wish to define your own extensions to
-ignore, use the ignore_extensions option:
+with the extensions tmpl, tt, tt2, html, and xhtml will be ignored by
+Static::Simple in the interest of security.  If you wish to define your own
+extensions to ignore, use the ignore_extensions option:
 
-    MyApp->config->{static}->{ignore_extensions} = [ qw/tt tt2 html xhtml/ ];
+    MyApp->config->{static}->{ignore_extensions} 
+        = [ qw/tmpl tt tt2 html xhtml/ ];
     
 =head2 Ignoring entire directories
 
@@ -371,17 +372,11 @@ you may enter your own extension to MIME type mapping.
         png => 'image/png',
     };
 
-=head2 Bypassing other plugins
+=head2 Compatibility with other plugins
 
-This plugin checks for a static file in the prepare_action stage.  If the
-request is for a static file, it will bypass all remaining prepare_action
-steps.  This means that by placing Static::Simple before all other plugins,
-they will not execute when a static file is found.  This can be helpful by
-skipping session cookie checks for example.  Or, if you want some plugins
-to run even on static files, list them before Static::Simple.
-
-Currently, work done by plugins in any other prepare method will execute
-normally.
+Since version 0.12, Static::Simple plays nice with other plugins.  It no
+longer short-circuits the prepare_action stage as it was causing too many
+compatibility issues with other plugins.
 
 =head2 Debugging information
 
