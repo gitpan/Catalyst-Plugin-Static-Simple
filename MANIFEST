@@ -25,6 +25,7 @@ t/07mime_types.t
 t/08subreq.t
 t/09ignore_ext.t
 t/10ignore_dirs.t
+t/11serve_static.t
 t/lib/TestApp.pm
 t/lib/TestApp/root/always-static/test
 t/lib/TestApp/root/always-static/test.html
