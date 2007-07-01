@@ -16,4 +16,4 @@ requires:
   Catalyst::Runtime: 5.30
   MIME::Types: 1.15
   Test::More: 0
-version: 0.17
+version: 0.18
