@@ -18,6 +18,8 @@ README
 t/01use.t
 t/02pod.t
 t/03podcoverage.t
+t/04critic.rc
+t/04critic.t
 t/04static.t
 t/05dirs.t
 t/06include_path.t
