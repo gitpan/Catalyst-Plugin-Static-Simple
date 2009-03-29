@@ -1,19 +1,25 @@
---- 
-abstract: Make serving static pages painless.
-author: Andy Grundman, <andy@hybridized.org>
+---
+abstract: 'Make serving static pages painless.'
+author:
+  - 'Andy Grundman, <andy@hybridized.org>'
+configure_requires:
+  ExtUtils::MakeMaker: 6.50
 distribution_type: module
-generated_by: Module::Install version 0.65
+generated_by: 'Module::Install version 0.81'
 license: perl
-meta-spec: 
-  url: http://module-build.sourceforge.net/META-spec-v1.3.html
-  version: 1.3
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
 name: Catalyst-Plugin-Static-Simple
-no_index: 
-  directory: 
+no_index:
+  directory:
     - inc
     - t
-requires: 
+requires:
   Catalyst::Runtime: 5.30
-  MIME::Types: 1.15
+  MIME::Types: 1.25
+  MRO::Compat: 0
   Test::More: 0
-version: 0.20
+resources:
+  license: http://dev.perl.org/licenses/
+version: 0.21
