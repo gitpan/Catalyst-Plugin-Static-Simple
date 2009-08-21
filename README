@@ -2,11 +2,15 @@ NAME
     Catalyst::Plugin::Static::Simple - Make serving static pages painless.
 
 SYNOPSIS
-        use Catalyst;
-        MyApp->setup( qw/Static::Simple/ );
-        # that's it; static content is automatically served by
-        # Catalyst, though you can configure things or bypass
-        # Catalyst entirely in a production environment
+        package MyApp;
+        use Catalyst qw/ Static::Simple /;
+        MyApp->setup;
+        # that's it; static content is automatically served by Catalyst
+        # from the application's root directory, though you can configure
+        # things or bypass Catalyst entirely in a production environment
+        #
+        # one caveat: the files must be served from an absolute path
+        # (i.e. /images/foo.png)
 
 DESCRIPTION
     The Static::Simple plugin is designed to make serving static content in
@@ -21,6 +25,18 @@ DESCRIPTION
 
     Note that actions mapped to paths using periods (.) will still operate
     properly.
+
+    If the plugin can not find the file, the request is dispatched to your
+    application instead. This means you are responsible for generating a 404
+    error if your applicaton can not process the request:
+
+       # handled by static::simple, not dispatched to your application
+       /images/exists.png
+   
+       # static::simple will not find the file and let your application
+       # handle the request. You are responsible for generating a file
+       # or returning a 404 error
+       /images/does_not_exist.png
 
     Though Static::Simple is designed to work out-of-the-box, you can tweak
     the operation by adding various configuration options. In a production
@@ -54,8 +70,8 @@ ADVANCED CONFIGURATION
     Since Catalyst 5.50, logging of static requests is turned off by
     default; static requests tend to clutter the log output and rarely
     reveal anything useful. However, if you want to enable logging of static
-    requests, you can do so by setting "MyApp->config->{static}->{no_logs}"
-    to 0.
+    requests, you can do so by setting "MyApp->config->{static}->{logging}"
+    to 1.
 
   Forcing directories into static mode
     Define a list of top-level directories beneath your 'root' directory
@@ -79,14 +95,14 @@ ADVANCED CONFIGURATION
             \&incpath_generator,
             MyApp->config->{root}
         ];
-    
+
     With the above setting, a request for the file "/images/logo.jpg" will
     search for the following files, returning the first one found:
 
         /path/to/overlay/images/logo.jpg
         /dynamic/path/images/logo.jpg
         /your/app/home/root/images/logo.jpg
-    
+
     The include path can contain a subroutine reference to dynamically
     return a list of available directories. This method will receive the $c
     object as a parameter and should return a reference to a list of
@@ -105,7 +121,7 @@ ADVANCED CONFIGURATION
                 die "No customer dir defined.";
             }
         }
-    
+
   Ignoring certain types of files
     There are some file types you may not wish to serve as static files.
     Most important in this category are your raw template files. By default,
@@ -114,9 +130,9 @@ ADVANCED CONFIGURATION
     define your own extensions to ignore, use the "ignore_extensions"
     option:
 
-        MyApp->config->{static}->{ignore_extensions} 
+        MyApp->config->{static}->{ignore_extensions}
             = [ qw/html asp php/ ];
-    
+
   Ignoring entire directories
     To prevent an entire directory from being served statically, you can use
     the "ignore_dirs" option. This option contains a list of relative
@@ -124,7 +140,7 @@ ADVANCED CONFIGURATION
     checked against every included path.
 
         MyApp->config->{static}->{ignore_dirs} = [ qw/tmpl css/ ];
-    
+
     For example, if combined with the above "include_path" setting, this
     "ignore_dirs" value will ignore the following directories if they exist:
 
@@ -133,7 +149,7 @@ ADVANCED CONFIGURATION
         /dynamic/path/tmpl
         /dynamic/path/css
         /your/app/home/root/tmpl
-        /your/app/home/root/css    
+        /your/app/home/root/css
 
   Custom MIME types
     To override or add to the default MIME types set by the MIME::Types
@@ -154,16 +170,16 @@ ADVANCED CONFIGURATION
     This is automatically enabled when running Catalyst in -Debug mode.
 
         MyApp->config->{static}->{debug} = 1;
-    
+
 USING WITH APACHE
     While Static::Simple will work just fine serving files through Catalyst
-    in mod_perl, for increased performance, you may wish to have Apache
-    handle the serving of your static files. To do this, simply use a
-    dedicated directory for your static files and configure an Apache
-    Location block for that directory. This approach is recommended for
+    in mod_perl, for increased performance you may wish to have Apache
+    handle the serving of your static files directly. To do this, simply use
+    a dedicated directory for your static files and configure an Apache
+    Location block for that directory This approach is recommended for
     production installations.
 
-        <Location /static>
+        <Location /myapp/static>
             SetHandler default-handler
         </Location>
 
@@ -171,6 +187,29 @@ USING WITH APACHE
     through Catalyst. You can leave Static::Simple as part of your
     application, and it will continue to function on a development server,
     or using Catalyst's built-in server.
+
+    In practice, your Catalyst application is probably (i.e. should be)
+    structured in the recommended way (i.e., that generated by bootstrapping
+    the application with the "catalyst.pl" script, with a main directory
+    under which is a "lib/" directory for module files and a "root/"
+    directory for templates and static files). Thus, unless you break up
+    this structure when deploying your app by moving the static files to a
+    different location in your filesystem, you will need to use an Alias
+    directive in Apache to point to the right place. You will then need to
+    add a Directory block to give permission for Apache to serve these
+    files. The final configuration will look something like this:
+
+        Alias /myapp/static /filesystem/path/to/MyApp/root/static
+        <Directory /filesystem/path/to/MyApp/root/static>
+            allow from all
+        </Directory>
+        <Location /myapp/static>
+            SetHandler default-handler
+        </Location>
+
+    If you are running in a VirtualHost, you can just set the DocumentRoot
+    location to the location of your root directory; see
+    Catalyst::Engine::Apache2::MP20.
 
 PUBLIC METHODS
   serve_static_file $file_path
@@ -218,6 +257,8 @@ CONTRIBUTORS
     Jesse Sheidlower, <jester@panix.com>
 
     Guillermo Roditi, <groditi@cpan.org>
+
+    Florian Ragwitz <rafl@debian.org>
 
 THANKS
     The authors of Catalyst::Plugin::Static:

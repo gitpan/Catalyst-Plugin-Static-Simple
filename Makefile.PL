@@ -1,16 +1,12 @@
-use inc::Module::Install 0.65;
+use inc::Module::Install 0.87;
 
 name 'Catalyst-Plugin-Static-Simple';
 all_from 'lib/Catalyst/Plugin/Static/Simple.pm';
 
-requires 'Catalyst::Runtime' => '5.30';
+requires 'Catalyst::Runtime' => '5.80008';
 requires 'MIME::Types' => '1.25';
 requires 'Test::More';
 requires 'MRO::Compat';
-
-unless( can_use 'Catalyst' => '5.33' ) {
-    requires 'File::Slurp';
-}
 
 if( can_use 'Catalyst::Plugin::SubRequest' ) {
     unless( can_use 'Catalyst::Plugin::SubRequest' => '0.08' ) {
@@ -24,4 +20,6 @@ if( can_use 'Catalyst::Plugin::SubRequest' ) {
 }
 
 auto_install;
+resources repository => 'http://dev.catalyst.perl.org/repos/Catalyst/Catalyst-Plugin-Static-Simple/trunk/';
+
 WriteAll;

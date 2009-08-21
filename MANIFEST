@@ -1,3 +1,4 @@
+.gitignore
 Changes
 inc/Module/AutoInstall.pm
 inc/Module/Install.pm
@@ -33,6 +34,7 @@ t/lib/TestApp/root/always-static/test
 t/lib/TestApp/root/always-static/test.html
 t/lib/TestApp/root/css/static.css
 t/lib/TestApp/root/files/bad.gif
+t/lib/TestApp/root/files/empty.txt
 t/lib/TestApp/root/files/err.omg
 t/lib/TestApp/root/files/static.css
 t/lib/TestApp/root/ignored/bad.gif
