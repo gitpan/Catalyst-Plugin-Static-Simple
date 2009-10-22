@@ -9,7 +9,7 @@ use IO::File ();
 use MIME::Types ();
 use MRO::Compat;
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 __PACKAGE__->mk_accessors( qw/_static_file _static_debug_message/ );
 
@@ -27,10 +27,19 @@ sub prepare_action {
         # strip trailing slashes, they'll be added in our regex
         $dir_re =~ s{/$}{};
 
-        my $re = ( $dir =~ m{^qr/}xms ) ? eval $dir : qr{^${dir_re}/};
-        if ($@) {
-            $c->error( "Error compiling static dir regex '$dir': $@" );
+        my $re;
+
+        if ( $dir =~ m{^qr/}xms ) {
+            $re = eval $dir;
+
+            if ($@) {
+                $c->error( "Error compiling static dir regex '$dir': $@" );
+            }
         }
+        else {
+            $re = qr{^${dir_re}/};
+        }
+
         if ( $path =~ $re ) {
             if ( $c->_locate_static_file( $path, 1 ) ) {
                 $c->_debug_msg( 'from static directory' )
@@ -537,7 +546,11 @@ Jesse Sheidlower, <jester@panix.com>
 
 Guillermo Roditi, <groditi@cpan.org>
 
-Florian Ragwitz <rafl@debian.org>
+Florian Ragwitz, <rafl@debian.org>
+
+Tomas Doran, <bobtfish@bobtfish.net>
+
+Justin Wheeler (dnm)
 
 =head1 THANKS
 
