@@ -1,19 +1,18 @@
 package Catalyst::Plugin::Static::Simple;
 
-use strict;
-use warnings;
-use base qw/Class::Accessor::Fast Class::Data::Inheritable/;
+use Moose::Role;
 use File::stat;
 use File::Spec ();
 use IO::File ();
 use MIME::Types ();
-use MRO::Compat;
+use namespace::autoclean;
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
-__PACKAGE__->mk_accessors( qw/_static_file _static_debug_message/ );
+has _static_file => ( is => 'rw' );
+has _static_debug_message => ( is => 'rw', isa => 'Str' );
 
-sub prepare_action {
+before prepare_action => sub {
     my $c = shift;
     my $path = $c->req->path;
     my $config = $c->config->{static};
@@ -58,11 +57,9 @@ sub prepare_action {
         # and does it exist?
         $c->_locate_static_file( $path );
     }
+};
 
-    return $c->next::method(@_);
-}
-
-sub dispatch {
+override dispatch => sub {
     my $c = shift;
 
     return if ( $c->res->status != 200 );
@@ -74,25 +71,21 @@ sub dispatch {
         return $c->_serve_static;
     }
     else {
-        return $c->next::method(@_);
+        return super;
     }
-}
+};
 
-sub finalize {
+before finalize => sub {
     my $c = shift;
 
     # display all log messages
     if ( $c->config->{static}{debug} && scalar @{$c->_debug_msg} ) {
         $c->log->debug( 'Static::Simple: ' . join q{ }, @{$c->_debug_msg} );
     }
+};
 
-    return $c->next::method(@_);
-}
-
-sub setup {
+before setup_finalize => sub {
     my $c = shift;
-
-    $c->maybe::next::method(@_);
 
     my $config = $c->config->{static} ||= {};
 
@@ -111,7 +104,7 @@ sub setup {
 
     # preload the type index hash so it's not built on the first request
     $config->{mime_types_obj}->create_type_index;
-}
+};
 
 # Search through all included directories for the static file
 # Based on Template Toolkit INCLUDE_PATH code
@@ -301,7 +294,7 @@ C<404> error if your applicaton can not process the request:
 
    # handled by static::simple, not dispatched to your application
    /images/exists.png
-   
+
    # static::simple will not find the file and let your application
    # handle the request. You are responsible for generating a file
    # or returning a 404 error
