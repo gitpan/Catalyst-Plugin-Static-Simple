@@ -26,6 +26,7 @@ t/09ignore_ext.t
 t/10ignore_dirs.t
 t/11serve_static.t
 t/12check_error_scope.t
+t/20debug.t
 t/author/02pod.t
 t/author/03podcoverage.t
 t/author/notabs.t

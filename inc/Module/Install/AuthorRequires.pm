@@ -4,12 +4,12 @@ use warnings;
 
 package Module::Install::AuthorRequires;
 
+use base 'Module::Install::Base';
+
 # cargo cult
-require Module::Install::Base;
 BEGIN {
-    our $VERSION = '0.01';
+    our $VERSION = '0.02';
     our $ISCORE  = 1;
-    our @ISA     = qw{Module::Install::Base};
 }
 
 sub author_requires {
