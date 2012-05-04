@@ -10,11 +10,11 @@ use Test::More tests => 5;
 use Catalyst::Test 'TestApp';
 
 # test defined static dirs
-TestApp->config->{static}->{dirs} = [
+TestApp->config->{'Plugin::Static::Simple'}->{dirs} = [
     'always-static',
 ];
 
-TestApp->config->{static}->{debug} = 1;
+TestApp->config->{'Plugin::Static::Simple'}->{debug} = 1;
 
 use Catalyst::Log;
 
@@ -34,5 +34,5 @@ ok( my $res = request('http://localhost/always-static/404.txt'), 'request ok' );
 is( $res->code, 404, '404 ok' );
 is( $res->content_type, 'text/html', '404 is text/html' );
 ok(defined $MESSAGES[0], 'debug message set');
-like( $MESSAGES[0], qr/404/, 'debug message contains 404'); 
+like( $MESSAGES[0], qr/404/, 'debug message contains 404');
 

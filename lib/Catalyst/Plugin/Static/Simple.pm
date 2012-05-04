@@ -6,9 +6,10 @@ use File::Spec ();
 use IO::File ();
 use MIME::Types ();
 use MooseX::Types::Moose qw/ArrayRef Str/;
+use Catalyst::Utils;
 use namespace::autoclean;
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 has _static_file => ( is => 'rw' );
 has _static_debug_message => ( is => 'rw', isa => ArrayRef[Str] );
@@ -16,7 +17,7 @@ has _static_debug_message => ( is => 'rw', isa => ArrayRef[Str] );
 before prepare_action => sub {
     my $c = shift;
     my $path = $c->req->path;
-    my $config = $c->config->{static};
+    my $config = $c->config->{'Plugin::Static::Simple'};
 
     $path =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
 
@@ -67,7 +68,7 @@ around dispatch => sub {
     return if ( $c->res->status != 200 );
 
     if ( $c->_static_file ) {
-        if ( $c->config->{static}{no_logs} && $c->log->can('abort') ) {
+        if ( $c->config->{'Plugin::Static::Simple'}->{no_logs} && $c->log->can('abort') ) {
            $c->log->abort( 1 );
         }
         return $c->_serve_static;
@@ -81,7 +82,7 @@ before finalize => sub {
     my $c = shift;
 
     # display all log messages
-    if ( $c->config->{static}{debug} && scalar @{$c->_debug_msg} ) {
+    if ( $c->config->{'Plugin::Static::Simple'}->{debug} && scalar @{$c->_debug_msg} ) {
         $c->log->debug( 'Static::Simple: ' . join q{ }, @{$c->_debug_msg} );
     }
 };
@@ -89,7 +90,15 @@ before finalize => sub {
 before setup_finalize => sub {
     my $c = shift;
 
-    my $config = $c->config->{static} ||= {};
+    $c->log->warn("Deprecated 'static' config key used, please use the key 'Plugin::Static::Simple' instead")
+        if exists $c->config->{static};
+    my $config
+        = $c->config->{'Plugin::Static::Simple'}
+        = $c->config->{'static'}
+        = Catalyst::Utils::merge_hashes(
+            $c->config->{'Plugin::Static::Simple'} || {},
+            $c->config->{static} || {}
+        );
 
     $config->{dirs} ||= [];
     $config->{include_path} ||= [ $c->config->{root} ];
@@ -117,7 +126,7 @@ sub _locate_static_file {
         File::Spec->no_upwards( File::Spec->splitdir( $path ) )
     );
 
-    my $config = $c->config->{static};
+    my $config = $c->config->{'Plugin::Static::Simple'};
     my @ipaths = @{ $config->{include_path} };
     my $dpaths;
     my $count = 64; # maximum number of directories to search
@@ -172,6 +181,7 @@ sub _locate_static_file {
 
 sub _serve_static {
     my $c = shift;
+    my $config = $c->config->{'Plugin::Static::Simple'};
 
     my $full_path = shift || $c->_static_file;
     my $type      = $c->_ext_to_type( $full_path );
@@ -180,6 +190,12 @@ sub _serve_static {
     $c->res->headers->content_type( $type );
     $c->res->headers->content_length( $stat->size );
     $c->res->headers->last_modified( $stat->mtime );
+    # Tell Firefox & friends its OK to cache, even over SSL:
+    $c->res->headers->header('Cache-control' => 'public');
+    # Optionally, set a fixed expiry time:
+    if ($config->{expires}) {
+        $c->res->headers->expires(time() + $config->{expires});
+    }
 
     my $fh = IO::File->new( $full_path, 'r' );
     if ( defined $fh ) {
@@ -197,7 +213,7 @@ sub _serve_static {
 sub serve_static_file {
     my ( $c, $full_path ) = @_;
 
-    my $config = $c->config->{static} ||= {};
+    my $config = $c->config->{'Plugin::Static::Simple'};
 
     if ( -e $full_path ) {
         $c->_debug_msg( "Serving static file: $full_path" )
@@ -218,7 +234,7 @@ sub serve_static_file {
 sub _ext_to_type {
     my ( $c, $full_path ) = @_;
 
-    my $config = $c->config->{static};
+    my $config = $c->config->{'Plugin::Static::Simple'};
 
     if ( $full_path =~ /.*\.(\S{1,})$/xms ) {
         my $ext = $1;
@@ -307,7 +323,7 @@ the operation by adding various configuration options. In a production
 environment, you will probably want to use your webserver to deliver
 static content; for an example see L<USING WITH APACHE>, below.
 
-=head1 DEFAULT BEHAVIOR
+=head1 DEFAULT BEHAVIOUR
 
 By default, Static::Simple will deliver all files having extensions
 (that is, bits of text following a period (C<.>)), I<except> files
@@ -450,6 +466,23 @@ module, you may enter your own extension to MIME type mapping.
         },
     );
 
+=head2 Controlling caching with Expires header
+
+The files served by Static::Simple will have a Last-Modified header set,
+which allows some browsers to cache them for a while. However if you want
+to explicitly set an Expires header, such as to allow proxies to cache your
+static content, then you can do so by setting the "expires" config option.
+
+The value indicates the number of seconds after access time to allow caching.
+So a value of zero really means "don't cache at all", and any higher values
+will keep the file around for that long.
+
+    MyApp->config(
+        static => {
+            expires => 3600, # Caching allowed for one hour.
+        },
+    );
+
 =head2 Compatibility with other plugins
 
 Since version 0.12, Static::Simple plays nice with other plugins.  It no
@@ -572,6 +605,8 @@ Justin Wheeler (dnm)
 
 Matt S Trout, <mst@shadowcat.co.uk>
 
+Toby Corkindale, <tjc@wintrmute.net>
+
 =head1 THANKS
 
 The authors of Catalyst::Plugin::Static:
@@ -586,7 +621,7 @@ For the include_path code from Template Toolkit:
 
 =head1 COPYRIGHT
 
-Copyright (c) 2005 - 2009
+Copyright (c) 2005 - 2011
 the Catalyst::Plugin::Static::Simple L</AUTHOR> and L</CONTRIBUTORS>
 as listed above.
 
