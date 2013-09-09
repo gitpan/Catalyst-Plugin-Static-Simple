@@ -1,5 +1,14 @@
 Revision history for Perl extension Catalyst::Plugin::Static::Simple
 
+0.31   2013-09-09 16:30:00
+        - Updated docs to reflect config key change from 'static' to
+          'Plugin::Static::Simple' (RT#77709)
+        - Migrated repository from subversion to git
+        - Fixed MIME::Types 2.xx compatibility be removing call to an
+          undocumented method
+        - Bumped the MIME::Types requirement to 2.03 to ensure its
+          improvements make it into Catalyst environments
+
 0.30   2012-05-04 17:05:00
         - Add Cache-Control:public header
         - Optionally provide Expires header

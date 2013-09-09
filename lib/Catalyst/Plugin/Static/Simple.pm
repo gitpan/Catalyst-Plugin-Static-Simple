@@ -9,7 +9,7 @@ use MooseX::Types::Moose qw/ArrayRef Str/;
 use Catalyst::Utils;
 use namespace::autoclean;
 
-our $VERSION = '0.30';
+our $VERSION = '0.31';
 
 has _static_file => ( is => 'rw' );
 has _static_debug_message => ( is => 'rw', isa => ArrayRef[Str] );
@@ -112,9 +112,6 @@ before setup_finalize => sub {
     # load up a MIME::Types object, only loading types with
     # at least 1 file extension
     $config->{mime_types_obj} = MIME::Types->new( only_complete => 1 );
-
-    # preload the type index hash so it's not built on the first request
-    $config->{mime_types_obj}->create_type_index;
 };
 
 # Search through all included directories for the static file
@@ -345,7 +342,7 @@ Logging of static files is turned off by default.
 =head1 ADVANCED CONFIGURATION
 
 Configuration is completely optional and is specified within
-C<MyApp-E<gt>config-E<gt>{static}>.  If you use any of these options,
+C<MyApp-E<gt>config-E<gt>{Plugin::Static::Simple}>.  If you use any of these options,
 this module will probably feel less "simple" to you!
 
 =head2 Enabling request logging
@@ -354,7 +351,7 @@ Since Catalyst 5.50, logging of static requests is turned off by
 default; static requests tend to clutter the log output and rarely
 reveal anything useful. However, if you want to enable logging of static
 requests, you can do so by setting
-C<MyApp-E<gt>config-E<gt>{static}-E<gt>{logging}> to 1.
+C<MyApp-E<gt>config-E<gt>{Plugin::Static::Simple}-E<gt>{logging}> to 1.
 
 =head2 Forcing directories into static mode
 
@@ -363,7 +360,7 @@ that should always be served in static mode.  Regular expressions may be
 specified using C<qr//>.
 
     MyApp->config(
-        static => {
+        'Plugin::Static::Simple' => {
             dirs => [
                 'static',
                 qr/^(images|css)/,
@@ -380,7 +377,7 @@ added to the search path when you specify an C<include_path>. You should
 use C<MyApp-E<gt>config-E<gt>{root}> to add it.
 
     MyApp->config(
-        static => {
+        'Plugin::Static::Simple' => {
             include_path => [
                 '/path/to/overlay',
                 \&incpath_generator,
@@ -424,7 +421,7 @@ If you wish to define your own extensions to ignore, use the
 C<ignore_extensions> option:
 
     MyApp->config(
-        static => {
+        'Plugin::Static::Simple' => {
             ignore_extensions => [ qw/html asp php/ ],
         },
     );
@@ -437,7 +434,7 @@ directory paths to ignore.  If using C<include_path>, the path will be
 checked against every included path.
 
     MyApp->config(
-        static => {
+        'Plugin::Static::Simple' => {
             ignore_dirs => [ qw/tmpl css/ ],
         },
     );
@@ -458,7 +455,7 @@ To override or add to the default MIME types set by the L<MIME::Types>
 module, you may enter your own extension to MIME type mapping.
 
     MyApp->config(
-        static => {
+        'Plugin::Static::Simple' => {
             mime_types => {
                 jpg => 'image/jpg',
                 png => 'image/png',
@@ -478,7 +475,7 @@ So a value of zero really means "don't cache at all", and any higher values
 will keep the file around for that long.
 
     MyApp->config(
-        static => {
+        'Plugin::Static::Simple' => {
             expires => 3600, # Caching allowed for one hour.
         },
     );
@@ -495,7 +492,7 @@ Enable additional debugging information printed in the Catalyst log.  This
 is automatically enabled when running Catalyst in -Debug mode.
 
     MyApp->config(
-        static => {
+        'Plugin::Static::Simple' => {
             debug => 1,
         },
     );

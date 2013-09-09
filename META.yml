@@ -21,12 +21,12 @@ no_index:
     - t
 requires:
   Catalyst::Runtime: 5.80008
-  MIME::Types: 1.25
+  MIME::Types: 2.03
   Moose: 0
   MooseX::Types: 0
   Test::More: 0
   namespace::autoclean: 0
 resources:
   license: http://dev.perl.org/licenses/
-  repository: http://dev.catalyst.perl.org/repos/Catalyst/Catalyst-Plugin-Static-Simple/trunk/
-version: 0.30
+  repository: git://git.shadowcat.co.uk/catagits/Catalyst-Plugin-Static-Simple.git
+version: 0.31
