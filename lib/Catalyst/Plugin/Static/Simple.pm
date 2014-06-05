@@ -9,10 +9,19 @@ use MooseX::Types::Moose qw/ArrayRef Str/;
 use Catalyst::Utils;
 use namespace::autoclean;
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
 
 has _static_file => ( is => 'rw' );
 has _static_debug_message => ( is => 'rw', isa => ArrayRef[Str] );
+
+after setup_finalize => sub {
+  my $c = shift;
+
+  # New: Turn off new 'autoflush' flag in logger (see Catalyst::Log).
+  # This is needed to surpress output of debug log messages for 
+  # static requests:
+  $c->log->autoflush(0) if $c->log->can('autoflush');
+};
 
 before prepare_action => sub {
     my $c = shift;

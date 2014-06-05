@@ -1,5 +1,10 @@
 Revision history for Perl extension Catalyst::Plugin::Static::Simple
 
+0.32   2014-06-04 17:00 EDT
+        - Sets 'autoflush' in the Catalyst Log object to false if 
+          available. This is a new API being added in Catalyst as of
+          version 5.90065
+
 0.31   2013-09-09 16:30:00
         - Updated docs to reflect config key change from 'static' to
           'Plugin::Static::Simple' (RT#77709)
