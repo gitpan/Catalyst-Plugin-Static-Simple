@@ -4,7 +4,7 @@
       "Andy Grundman, <andy@hybridized.org>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "ExtUtils::MakeMaker version 6.59, CPAN::Meta::Converter version 2.140640",
+   "generated_by" : "Module::Install version 1.12, CPAN::Meta::Converter version 2.142060",
    "license" : [
       "perl_5"
    ],
@@ -15,8 +15,8 @@
    "name" : "Catalyst-Plugin-Static-Simple",
    "no_index" : {
       "directory" : [
-         "t",
-         "inc"
+         "inc",
+         "t"
       ]
    },
    "prereqs" : {
@@ -43,5 +43,14 @@
       }
    },
    "release_status" : "stable",
+   "resources" : {
+      "license" : [
+         "http://dev.perl.org/licenses/"
+      ],
+      "repository" : {
+         "type" : "git",
+         "url" : "git://git.shadowcat.co.uk/catagits/Catalyst-Plugin-Static-Simple.git"
+      }
+   },
    "version" : "0.32"
 }

@@ -1,3 +1,4 @@
+.travis.yml
 Changes
 inc/Module/AutoInstall.pm
 inc/Module/Install.pm
@@ -28,10 +29,16 @@ t/09ignore_ext.t
 t/10ignore_dirs.t
 t/11serve_static.t
 t/12check_error_scope.t
+t/13no_include_path.t
+t/14deprecated.t
 t/20debug.t
 t/author/02pod.t
 t/author/03podcoverage.t
 t/author/notabs.t
+t/lib/IncTestApp.pm
+t/lib/IncTestApp/Controller/Root.pm
+t/lib/IncTestApp/root/images/bad.gif
+t/lib/IncTestApp/root/overlay/overlay.jpg
 t/lib/TestApp.pm
 t/lib/TestApp/Controller/Root.pm
 t/lib/TestApp/root/always-static/test
@@ -53,3 +60,4 @@ t/lib/TestApp/root/overlay/o-ignored/index.html
 t/lib/TestApp/root/overlay/o-ignored/static.css
 t/lib/TestApp/root/overlay/o-ignored/tmpl.tt
 t/lib/TestApp/root/overlay/overlay.jpg
+t/lib/TestLog.pm
